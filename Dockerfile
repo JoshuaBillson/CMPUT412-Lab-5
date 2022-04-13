@@ -1,8 +1,7 @@
 # parameters
-ARG REPO_NAME="<REPO_NAME_HERE>"
-ARG DESCRIPTION="<DESCRIPTION_HERE>"
-ARG MAINTAINER="<YOUR_FULL_NAME> (<YOUR_EMAIL_ADDRESS>)"
-# pick an icon from: https://fontawesome.com/v4.7.0/icons/
+ARG REPO_NAME="CMPUT412-Lab-5"
+ARG DESCRIPTION="CMPUT 412 Lab 5"
+ARG MAINTAINER="Joshua Billson (jmbillson@outlook.com)"
 ARG ICON="cube"
 
 # ==================================================>
