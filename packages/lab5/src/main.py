@@ -2,48 +2,61 @@
 
 import time
 import os
+import math
 import rospy
-from std_msgs.msg import Float32, Int32, String
+from std_msgs.msg import Int32
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import Twist2DStamped, WheelsCmdStamped
-from std_msgs.msg import String
-import smach
-from threading import Lock, Thread
+from std_msgs.msg import Int32
+from geometry_msgs.msg import Quaternion, Point, Pose, Vector3
+from tf.transformations import euler_from_quaternion
+from threading import Lock
 
-MOTOR_TOPIC = "/csc22912/car_cmd_switch_node/cmd"
-LEFT_MOTOR_TOPIC = "/csc22912/wheels_driver_node/wheels_cmd"
-LINE_TRACKER_TOPIC = "/csc22912/output/line_tracker"
-STOP_MATCHER_TOPIC = "/csc22912/output/stop_matcher"
-TOPIC = "csc22912/output/msg"
-VELOCITY = 0.30
+POSE_TOPIC = "csc22912/output/position"
+ORIENTATION_TOPIC = "csc22912/output/orientation"
+TAG_ID_TOPIC = "csc22912/output/tag_id"
 
 class MyPublisherNode(DTROS):
     def __init__(self, node_name):
         super(MyPublisherNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
-        self.pub = rospy.Publisher(TOPIC, String, queue_size=10)
+        self.pose_subscriber = rospy.Subscriber(POSE_TOPIC, Vector3, self.pose_callback, queue_size=1)
+        self.orientation_subscriber = rospy.Subscriber(ORIENTATION_TOPIC, Vector3, self.orientation_callback, queue_size=1)
+        self.tag_subscriber = rospy.Subscriber(TAG_ID_TOPIC, Int32, self.tag_callback, queue_size=1)
+        self.mutex = Lock()
+        self.tag_id = None
+        self.position = (0, 0, 0)
+        self.orientation = (0, 0, 0)
+    
+    def pose_callback(self, data: Vector3):
+        with self.mutex:
+            self.position = (data.x, data.y, data.z)
+
+    def orientation_callback(self, data: Vector3):
+        with self.mutex:
+            self.orientation = (data.x, data.y, data.z)
+    
+    def tag_callback(self, data: Int32):
+        self.tag_id = data.data
 
     def run(self):
-
-        counter = 0
-        rate = rospy.Rate(1)
+        count = 0
+        rate = rospy.Rate(10)
+        locations = [(0, 0, 0) for i in range(10)]
+        orientations = [(0, 0, 0) for i in range(10)]
         while not rospy.is_shutdown():
-            msg = String()
-            msg.data = f"Hello World {counter}!"
-            counter += 1
-            self.pub.publish(msg)
+            with self.mutex:
+                locations.pop(0)
+                locations.append(self.position)
+                orientations.pop(0)
+                orientations.append(self.orientation)
+            
+            count += 1
+            if count == 10:
+                location = (sum([x[0] for x in locations]), sum([x[1] for x in locations]), sum([x[2] for x in locations]))
+                orientation = (sum([x[0] for x in orientations]), sum([x[1] for x in orientations]), sum([x[2] for x in orientations]))
+                rospy.loginfo(f"Location: {tuple(map(lambda x: round(x / count, 2), location))}   Orientation: {tuple(map(lambda x: round(x / count, 2), orientation))}")
+                count = 0
             rate.sleep()
     
-        # Open the container
-        """
-        with sm:
-            # Add states to the container
-            smach.StateMachine.add('FOLLOW_PATH', FollowPath(motor_controller, line_tracker, stop_matcher), transitions={'stop':'STOP'})
-            smach.StateMachine.add('STOP', Stop(motor_controller, line_tracker, stop_matcher), transitions={'finish':'FINISH'})
-    
-        # Execute SMACH plan
-        outcome = sm.execute()
-        """
-
 
 if __name__ == '__main__':
     node = MyPublisherNode(node_name='lab_5_main_node')
